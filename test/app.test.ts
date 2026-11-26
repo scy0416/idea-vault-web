@@ -7,8 +7,10 @@ import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { App } from "../src/app/App.tsx";
 
-it("첫 화면에 앱 이름이 보인다", () => {
-  expect(renderToStaticMarkup(createElement(App))).toContain("<h1>아이디어 볼트</h1>");
+it("저장 공간이 열리기 전에는 설정을 누를 수 없다", () => {
+  const html = renderToStaticMarkup(createElement(App, { open: () => new Promise<never>(() => {}) }));
+  expect(html).toContain("<h1>아이디어 볼트</h1>");
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>설정<\/button>/);
 });
 
 describe("배포본", () => {

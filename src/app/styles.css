@@ -3,6 +3,9 @@
   --ink: #14212b;
   --mute: #586a76;
   --line: #d3dcdf;
+  --card: #fff;
+  --focus: #1d5fa8;
+  --danger: #a52a2a;
   color-scheme: light dark;
 }
 
@@ -12,6 +15,9 @@
     --ink: #e6edf0;
     --mute: #98aab5;
     --line: #2c3b45;
+    --card: #19232a;
+    --focus: #7db6f2;
+    --danger: #f08b8b;
   }
 }
 
@@ -36,9 +42,125 @@ main {
   padding-block: 20px 64px;
 }
 
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 h1 {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 20px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.danger {
+  align-self: flex-start;
+  white-space: normal;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* 16px보다 작으면 휴대폰이 입력할 때 화면을 확대한다. */
+input {
+  min-width: 0;
+  width: 100%;
+  font-size: 16px;
+}
+
+input:not([type="file"]) {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.stack,
+.card,
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.field {
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 좁은 화면에서는 단추가 아래 줄로 내려간다. */
+.row input {
+  flex: 1 1 140px;
+}
+
+/* 아래쪽에서 누른 결과도 보이게 화면 위에 붙인다. */
+.status {
+  position: sticky;
+  top: env(safe-area-inset-top, 0);
+  z-index: 1;
+}
+
+.hint {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.notice {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+.error {
+  color: var(--danger);
 }
 
 .empty {

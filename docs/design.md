@@ -147,6 +147,7 @@ links:
 | OpenAI 키 | 이 앱 전용 프로젝트에서 발급. 월 한도를 정하고 [`Enforce a hard limit`](https://developers.openai.com/api/docs/guides/spend-limits)를 켠다. 반영이 늦어 조금 초과할 수 있다 |
 | 보관 | 코드와 저장소에 넣지 않는다. 기기마다 설정 화면에서 한 번 입력하거나 기기의 `.env` 파일을 골라 불러오면, 그 기기의 IndexedDB에 저장한다. 별도 암호와 암호화는 두지 않는다 |
 | 지우기 | 설정의 `이 기기에서 지우기`로 토큰, 키, 캐시를 삭제한다. 아직 올리지 못한 변경이 있으면 먼저 알린다 |
+| 저장소 바꾸기 | 받거나 올린 노트가 이 기기에 있으면 다른 저장소로 바꾸지 못한다. 먼저 `이 기기에서 지우기`를 한다 |
 | 기기 | 화면 잠금을 사용한다. 기기를 잃어버리면 토큰과 키를 폐기한다 |
 | 브라우저 호출 | OpenAI SDK는 브라우저 사용을 [기본으로 막는다](https://github.com/openai/openai-node)(`dangerouslyAllowBrowser`). 나만 쓰는 앱이고 위 조건을 지킬 때만 켠다 |
 | 외부 스크립트 | 불러오지 않는다. CSP로 스크립트는 자기 자신, 통신은 `api.github.com`과 `api.openai.com`만 허용 |

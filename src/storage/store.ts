@@ -70,6 +70,11 @@ export async function openStore(factory: IDBFactory = indexedDB, name: string = 
 
     getEntry: (id: string) => read(NOTES, (s) => getEntry(s, id)),
 
+    /** 원격과 맞춘 적이 있는 노트가 있는지. 있으면 저장소를 바꿀 때 섞인다. */
+    async hasSynced(): Promise<boolean> {
+      return (await read(NOTES, allEntries)).some((e) => e.base !== null);
+    },
+
     /** 아직 올리지 못한 변경. 오래된 노트부터 */
     listPending: () => read(NOTES, (s) => result<Entry[]>(s.index("dirty").getAll(1))),
 
