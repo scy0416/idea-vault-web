@@ -3,8 +3,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { DEFAULT_MODELS } from "../../src/core/models.ts";
+import { noteId } from "../../src/core/note-id.ts";
 import { createOpenAI } from "../../src/core/openai.ts";
-import { noteId, parseNotes } from "./input.ts";
+import { parseNotes } from "./input.ts";
 import { runTrial } from "./pipeline.ts";
 import { renderReport, totalCost } from "./report.ts";
 
