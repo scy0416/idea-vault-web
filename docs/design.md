@@ -162,6 +162,7 @@ links:
 
 - 원본은 GitHub다. IndexedDB는 지워져도 되는 캐시로 다룬다. 브라우저는 [저장 데이터를 지울 수 있다](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
 - 예외는 아직 올리지 못한 변경이다. 눈에 띄게 표시하고 먼저 보낸다. `navigator.storage.persist()`를 요청한다.
+- 노트마다 이 기기의 내용, 마지막으로 맞춘 원격 내용(합치기의 기준), 올리지 못함 표시를 함께 둔다. 올리지 못한 노트는 원격 내용으로 덮어쓰지 않는다.
 - 벡터는 숫자 배열(Float32)로, 본문 해시와 모델 이름을 함께 저장한다. 바뀐 노트만 다시 만든다. 5,000개면 약 31MB다.
 - 검색은 모든 벡터와 비교한다. 느리면 차원을 줄인다.
 
