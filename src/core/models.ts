@@ -3,7 +3,7 @@
 
 export const DEFAULT_MODELS = {
   link: "gpt-6-luna",
-  ask: "gpt-6.1-terra",
+  ask: "gpt-6-luna",
   embedding: "text-embedding-3-small",
 } as const;
 
