@@ -4,3 +4,5 @@
 node_modules/
 dist/
 .claude/settings.local.json
+# 실제 노트와 시험 결과 (커밋하지 않는다)
+local/

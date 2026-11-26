@@ -1,0 +1,19 @@
+{
+  "name": "idea-vault-web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "w0": "node scripts/w0/run.ts",
+    "w0:score": "node scripts/w0/score.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.4",
+    "typescript": "7.0.2",
+    "vitest": "5.1.2"
+  }
+}
