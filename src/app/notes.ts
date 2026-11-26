@@ -57,6 +57,12 @@ export function removeTag(note: StoredNote, tag: string): StoredNote {
   return { ...note, tags: note.tags.filter((t) => t !== tag), tagsByUser: true };
 }
 
+/** 저장하지 않은 본문과, 적기 시작할 때의 본문 */
+export interface Draft {
+  text: string;
+  from: string;
+}
+
 /** 저장할 본문. 앞뒤 빈 줄만 다듬는다. */
 export const cleanBody = (text: string): string => text.replace(/\r\n?/g, "\n").trim();
 

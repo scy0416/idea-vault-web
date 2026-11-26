@@ -1,25 +1,18 @@
 // 기기 저장 (설계 8절). 원본은 GitHub이며 이곳은 지워져도 되는 캐시다.
 // 예외는 아직 올리지 못한 변경으로, 올리기 전에는 원격 내용으로 덮어쓰지 않는다.
-import { createNote, notePath, parseNote, type StoredNote } from "../core/note-file.ts";
+import { createNote, notePath, parseNote, serializeNote, type StoredNote } from "../core/note-file.ts";
+import { uniqueNoteId } from "../core/note-id.ts";
 import { result, transact } from "./idb.ts";
+import { reconcile, type Entry, type Notice, type RemoteFile } from "./reconcile.ts";
+
+export type { Entry, Notice, RemoteFile };
 
 export const DB_NAME = "idea-vault";
 const DB_VERSION = 1;
 const NOTES = "notes";
 const META = "meta";
 const SETTINGS_KEY = "settings";
-
-export interface Entry {
-  id: string;
-  /** 이 기기에서 보는 내용. null이면 지웠고 아직 올리지 못한 상태다. */
-  note: StoredNote | null;
-  /** 마지막으로 맞춘 원격 파일 내용. null이면 원격에 없다. 합칠 때의 기준이다. */
-  base: string | null;
-  /** 1이면 아직 올리지 못했다. (IndexedDB 색인은 참/거짓을 담지 못한다) */
-  dirty: 0 | 1;
-  /** 이 기기에서 바꿀 때마다 늘어난다. 올리는 동안 또 바뀌었는지 가린다. */
-  revision: number;
-}
+const SYNC_KEY = "sync";
 
 /** 사용자가 알아야 할 올리지 못한 변경인지. 올린 적 없이 지운 노트는 잃을 것이 없다. */
 export const isUnsent = (e: Entry): boolean => e.dirty === 1 && (e.note !== null || e.base !== null);
@@ -30,6 +23,15 @@ export interface Settings {
   githubToken?: string;
   openaiKey?: string;
 }
+
+/** 마지막으로 전부 받아 온 원격의 위치 */
+export interface SyncState {
+  repository: string;
+  head: string;
+}
+
+/** 충돌한 본문 중 남길 것. both는 이 기기의 본문을 새 노트로 함께 남긴다. */
+export type Choice = "local" | "remote" | "both";
 
 export type Store = Awaited<ReturnType<typeof openStore>>;
 
@@ -55,12 +57,19 @@ export async function openStore(factory: IDBFactory = indexedDB, name: string = 
   /** 이 기기의 변경으로 기록한다. */
   async function change(s: IDBObjectStore, previous: Entry | undefined, id: string, note: StoredNote | null) {
     const entry: Entry = {
+      ...previous,
       id,
       note,
       base: previous?.base ?? null,
       dirty: 1,
       revision: (previous?.revision ?? 0) + 1,
     };
+    // 충돌한 노트를 지우면 지금의 원격 내용을 지우는 것이다.
+    if (note === null && entry.conflict) {
+      entry.base = entry.conflict.content;
+      entry.sha = entry.conflict.sha;
+      delete entry.conflict;
+    }
     await result(s.put(entry));
   }
 
@@ -72,6 +81,8 @@ export async function openStore(factory: IDBFactory = indexedDB, name: string = 
     },
 
     getEntry: (id: string) => read(NOTES, (s) => getEntry(s, id)),
+
+    listEntries: () => read(NOTES, allEntries),
 
     /** 원격과 맞춘 적이 있는 노트가 있는지. 있으면 저장소를 바꿀 때 섞인다. */
     async hasSynced(): Promise<boolean> {
@@ -131,32 +142,97 @@ export async function openStore(factory: IDBFactory = indexedDB, name: string = 
       });
     },
 
-    /**
-     * 올리기에 성공한 뒤 부른다. revision은 올린 시점의 값, content는 올린 파일 내용(지웠으면 null)이다.
-     * 올리는 동안 또 바뀌었으면 아직 올리지 못한 상태로 남는다.
-     */
-    markUploaded(id: string, revision: number, content: string | null): Promise<void> {
+    /** 올리기 전에 부른다. 응답을 받지 못해도 다음에 받은 내용이 내 것인지 알 수 있다. */
+    markSending(items: { id: string; content: string }[]): Promise<void> {
       return write(NOTES, async (s) => {
-        const entry = await getEntry(s, id);
-        if (!entry) return;
-        const unchanged = entry.revision === revision;
-        if (unchanged && !entry.note) await result(s.delete(id));
-        else await result(s.put({ ...entry, base: content, dirty: unchanged ? 0 : 1 } satisfies Entry));
+        for (const { id, content } of items) {
+          const entry = await getEntry(s, id);
+          if (entry) await result(s.put({ ...entry, sent: content } satisfies Entry));
+        }
       });
     },
 
     /**
-     * 원격에서 받은 내용을 반영한다. content가 null이면 원격에서 지워진 것이다.
-     * 아직 올리지 못한 변경이 있으면 건드리지 않고 "pending"을 돌려준다. 합치기는 동기화가 한다.
-     * 읽을 수 없는 파일이면 FormatError를 던지고 이전 내용을 남긴다.
+     * 올리기에 성공한 뒤 부른다. revision은 올린 시점의 값, file은 올린 파일(지웠으면 null)이다.
+     * 올리는 동안 또 바뀌었으면 아직 올리지 못한 상태로 남는다.
      */
-    async applyRemote(id: string, content: string | null): Promise<"applied" | "pending"> {
-      const note = content === null ? null : parseNote(notePath(id), content);
+    markUploaded(id: string, revision: number, file: RemoteFile | null): Promise<void> {
       return write(NOTES, async (s) => {
-        if ((await getEntry(s, id))?.dirty) return "pending";
-        if (note === null) await result(s.delete(id));
-        else await result(s.put({ id, note, base: content, dirty: 0, revision: 0 } satisfies Entry));
-        return "applied";
+        const entry = await getEntry(s, id);
+        if (!entry) return;
+        const unchanged = entry.revision === revision;
+        if (unchanged && !entry.note) return void (await result(s.delete(id)));
+        const next: Entry = { ...entry, base: file?.content ?? null, dirty: unchanged ? 0 : 1 };
+        if (file) next.sha = file.sha;
+        else delete next.sha;
+        delete next.sent;
+        await result(s.put(next));
+      });
+    },
+
+    /**
+     * 원격에서 받은 파일을 반영한다. remote가 null이면 원격에 없는 것이다.
+     * 올리지 못한 변경은 합친다. 읽을 수 없는 파일이면 FormatError를 던지고 이전 내용을 남긴다.
+     * remoteIds는 새 ID를 줄 때 피할 원격의 ID다.
+     */
+    receive(id: string, remote: RemoteFile | null, remoteIds: Iterable<string> = []): Promise<Notice | undefined> {
+      return write(NOTES, async (s) => {
+        const outcome = reconcile(id, await getEntry(s, id), remote);
+        if (outcome.entry === null) await result(s.delete(id));
+        else if (outcome.entry) await result(s.put(outcome.entry));
+        if (outcome.moved) {
+          const used = new Set([...((await result(s.getAllKeys())) as string[]), ...remoteIds]);
+          const newId = uniqueNoteId(id, used);
+          // 함께 올리기 전이던 노트의 연결은 새 ID를 따라간다.
+          for (const entry of await allEntries(s)) {
+            if (entry.base !== null || !entry.note?.links.some((l) => l.to === id)) continue;
+            const links = entry.note.links.map((l) => (l.to === id ? { ...l, to: newId } : l));
+            await change(s, entry, entry.id, { ...entry.note, links });
+          }
+          await change(s, undefined, newId, { ...outcome.moved, id: newId });
+        }
+        return outcome.notice;
+      });
+    },
+
+    /** 충돌한 본문 중 남길 것을 고른다. 태그와 연결은 이미 합쳐져 있다. */
+    resolveConflict(id: string, choice: Choice, now: Date = new Date()): Promise<boolean> {
+      return write(NOTES, async (s) => {
+        const entry = await getEntry(s, id);
+        if (!entry?.note || !entry.conflict) return false;
+        const { conflict, ...rest } = entry;
+        const theirs = parseNote(notePath(id), conflict.content);
+        let note = entry.note;
+        if (choice !== "local") {
+          note = { ...note, text: theirs.text };
+          if (theirs.processed === undefined) delete note.processed;
+          else note.processed = theirs.processed;
+        }
+        await result(
+          s.put({
+            ...rest,
+            note,
+            base: conflict.content,
+            sha: conflict.sha,
+            dirty: serializeNote(note) === serializeNote(theirs) ? 0 : 1,
+            revision: entry.revision + 1,
+          } satisfies Entry),
+        );
+        if (choice === "both") {
+          const used = new Set((await result(s.getAllKeys())) as string[]);
+          const copy = createNote(entry.note.text, used, now);
+          const { tags, tagsByUser, text } = entry.note;
+          await change(s, undefined, copy.id, { ...copy, text, tags, tagsByUser });
+        }
+        return true;
+      });
+    },
+
+    getSyncState: () => read(META, (s) => result<SyncState | undefined>(s.get(SYNC_KEY))),
+
+    saveSyncState(state: SyncState): Promise<void> {
+      return write(META, async (s) => {
+        await result(s.put(state, SYNC_KEY));
       });
     },
 

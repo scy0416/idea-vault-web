@@ -9,6 +9,8 @@ export function NoteList(props: {
   notes: StoredNote[];
   /** 아직 올리지 못한 노트의 ID */
   pending: Set<string>;
+  /** 본문을 골라야 하는 노트의 ID */
+  conflicts?: Set<string> | Map<string, string>;
   filter: Filter;
   onFilter: (filter: Filter) => void;
   onOpen: (id: string) => void;
@@ -69,7 +71,11 @@ export function NoteList(props: {
                 {note.tags.map((t) => (
                   <span key={t}>#{t}</span>
                 ))}
-                {pending.has(note.id) && <span className="pending">아직 올리지 못함</span>}
+                {props.conflicts?.has(note.id) ? (
+                  <span className="error">내용을 골라야 함</span>
+                ) : (
+                  pending.has(note.id) && <span className="pending">아직 올리지 못함</span>
+                )}
               </span>
             </button>
           </li>

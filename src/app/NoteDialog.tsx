@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { StoredNote } from "../core/note-file.ts";
-import { cleanBody, shortTime } from "./notes.ts";
+import type { Choice } from "../storage/store.ts";
+import { cleanBody, shortTime, type Draft } from "./notes.ts";
 
 export function NoteDialog(props: {
   note: StoredNote;
   pending: boolean;
   /** 저장하지 않은 본문. 없으면 undefined. 창을 닫아도 남는다. */
-  draft: string | undefined;
+  draft: Draft | undefined;
+  /** 본문이 충돌하면 저장소 쪽 본문 */
+  theirs?: string | undefined;
+  onResolve: (choice: Choice) => void;
   error: string | null;
-  onDraft: (draft: string | undefined) => void;
+  onDraft: (draft: Draft | undefined) => void;
   onSaveText: (text: string) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
@@ -18,8 +22,10 @@ export function NoteDialog(props: {
   const { note, draft } = props;
   const dialog = useRef<HTMLDialogElement>(null);
   const [confirming, setConfirming] = useState(false);
-  const text = draft ?? note.text;
-  const changed = draft !== undefined && cleanBody(draft) !== note.text;
+  const text = draft?.text ?? note.text;
+  const changed = draft !== undefined && cleanBody(draft.text) !== note.text;
+  // 적기 시작한 뒤에 동기화로 본문이 바뀌었는지
+  const moved = changed && draft.from !== note.text;
 
   useEffect(() => {
     const element = dialog.current;
@@ -32,7 +38,7 @@ export function NoteDialog(props: {
         <div className="row between head">
           <span className="hint">
             {note.id} · {shortTime(note.created)}
-            {props.pending && <span className="pending"> · 아직 올리지 못함</span>}
+            {props.pending && props.theirs === undefined && <span className="pending"> · 아직 올리지 못함</span>}
           </span>
           <button type="button" onClick={() => dialog.current?.close()}>
             닫기
@@ -43,14 +49,42 @@ export function NoteDialog(props: {
             {props.error}
           </p>
         )}
-        <div className="field">
+        {props.theirs !== undefined && (
+          <div className="stack">
+            <p className="error">본문이 이 기기와 저장소에서 다르게 바뀌었습니다. 남길 내용을 고르세요.</p>
+            <div className="field">
+              <h2>이 기기</h2>
+              <p className="version">{note.text}</p>
+              <button type="button" onClick={() => props.onResolve("local")}>
+                이 기기 것 남기기
+              </button>
+            </div>
+            <div className="field">
+              <h2>저장소</h2>
+              <p className="version">{props.theirs}</p>
+              <button type="button" onClick={() => props.onResolve("remote")}>
+                저장소 것 남기기
+              </button>
+            </div>
+            <button type="button" className="primary" onClick={() => props.onResolve("both")}>
+              둘 다 남기기 (이 기기 것은 새 노트로)
+            </button>
+          </div>
+        )}
+        <div className="field" hidden={props.theirs !== undefined}>
+          {moved && (
+            <div className="notice field">
+              <p className="error">적는 동안 저장된 본문이 바뀌었습니다. 수정 저장을 누르면 아래 내용을 덮어씁니다.</p>
+              <p className="version">{note.text}</p>
+            </div>
+          )}
           <textarea
             aria-label="노트 내용"
             rows={5}
             value={text}
             onChange={(e) => {
               const value = e.currentTarget.value;
-              props.onDraft(value === note.text ? undefined : value);
+              props.onDraft(value === note.text ? undefined : { text: value, from: draft?.from ?? note.text });
             }}
           />
           {changed && (

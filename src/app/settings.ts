@@ -2,6 +2,7 @@
 import { parseEnv } from "../core/env-file.ts";
 import { parseRepository } from "../core/repository.ts";
 import { isUnsent, type Settings, type Store } from "../storage/store.ts";
+import { withVaultLock } from "../sync/lock.ts";
 
 export const MAX_ENV_BYTES = 64 * 1024;
 
@@ -29,7 +30,11 @@ const summarize = (s: Settings): Summary => ({
 
 export const loadSummary = async (store: Store): Promise<Summary> => summarize(await store.getSettings());
 
-export async function saveRepository(store: Store, input: string): Promise<Summary> {
+/** 동기화하는 중에 저장소가 바뀌지 않도록 끝나기를 기다린다. */
+export const saveRepository = (store: Store, input: string): Promise<Summary> =>
+  withVaultLock(() => changeRepository(store, input));
+
+async function changeRepository(store: Store, input: string): Promise<Summary> {
   const repository = input.trim() ? parseRepository(input) : "";
   if (repository === null) throw new SettingsError("저장소는 `소유자/저장소` 형식으로 적으세요.");
   const current = (await store.getSettings()).repository ?? "";
@@ -73,7 +78,9 @@ export async function importEnv(
 
 export const pendingCount = async (store: Store): Promise<number> => (await store.listPending()).filter(isUnsent).length;
 
-export async function wipeDevice(store: Store): Promise<Summary> {
-  await store.wipe();
-  return loadSummary(store);
-}
+/** 동기화하는 중에 지우면 받은 노트가 다시 생기므로 끝나기를 기다린다. */
+export const wipeDevice = (store: Store): Promise<Summary> =>
+  withVaultLock(async () => {
+    await store.wipe();
+    return loadSummary(store);
+  });

@@ -21,7 +21,8 @@ const remoteNote = (id: string, text = "원격에서 온 노트"): StoredNote =>
   links: [],
 });
 const link = (to: string) => ({ to, why: "지어낸 이유", by: "user" as const, at: "2026-11-26T15:30:12+09:00" });
-const receive = (note: StoredNote) => store.applyRemote(note.id, serializeNote(note));
+const file = (content: string) => ({ content, sha: `sha:${content}` });
+const receive = (note: StoredNote) => store.receive(note.id, file(serializeNote(note)));
 const pendingIds = async () => (await store.listPending()).map((e) => e.id);
 
 describe("적기", () => {
@@ -45,7 +46,7 @@ describe("적기", () => {
     const note = remoteNote("20260101000000");
     await receive(note);
     expect(await store.saveNote({ ...note, text: "고친 글" })).toBe(true);
-    expect(await store.getEntry(note.id)).toMatchObject({ base: serializeNote(note), dirty: 1, revision: 1 });
+    expect(await store.getEntry(note.id)).toMatchObject({ base: serializeNote(note), dirty: 1, revision: 2 });
   });
 
   it("없거나 지운 노트는 수정으로 되살아나지 않는다", async () => {
@@ -82,7 +83,7 @@ describe("올린 뒤", () => {
   it("올리면 대기 목록에서 빠지고 올린 내용이 기준이 된다", async () => {
     const [note] = await store.addNotes(["가"], NOW);
     const content = serializeNote(note!);
-    await store.markUploaded(note!.id, 1, content);
+    await store.markUploaded(note!.id, 1, file(content));
     expect(await pendingIds()).toEqual([]);
     expect(await store.getEntry(note!.id)).toMatchObject({ base: content, dirty: 0 });
   });
@@ -90,7 +91,7 @@ describe("올린 뒤", () => {
   it("올리는 동안 고쳤으면 남는다", async () => {
     const [note] = await store.addNotes(["가"], NOW);
     await store.saveNote({ ...note!, text: "그사이 고침" });
-    await store.markUploaded(note!.id, 1, serializeNote(note!));
+    await store.markUploaded(note!.id, 1, file(serializeNote(note!)));
     expect(await store.getEntry(note!.id)).toMatchObject({
       note: { text: "그사이 고침" },
       base: serializeNote(note!),
@@ -101,7 +102,7 @@ describe("올린 뒤", () => {
   it("새 노트를 올리는 동안 지웠으면 삭제도 올려야 한다", async () => {
     const [note] = await store.addNotes(["가"], NOW);
     await store.deleteNote(note!.id);
-    await store.markUploaded(note!.id, 1, serializeNote(note!));
+    await store.markUploaded(note!.id, 1, file(serializeNote(note!)));
     expect(await store.getEntry(note!.id)).toMatchObject({ note: null, dirty: 1 });
 
     await store.markUploaded(note!.id, 2, null);
@@ -113,25 +114,25 @@ describe("원격 반영", () => {
   const ID = "20260101000000";
 
   it("받은 노트를 넣고 바꾸고 지운다", async () => {
-    expect(await receive(remoteNote(ID))).toBe("applied");
+    await receive(remoteNote(ID));
     await receive(remoteNote(ID, "바뀐 글"));
     expect((await store.listNotes())[0]!.text).toBe("바뀐 글");
-    await store.applyRemote(ID, null);
+    await store.receive(ID, null);
     expect(await store.listNotes()).toEqual([]);
     expect(await pendingIds()).toEqual([]);
   });
 
-  it("올리지 못한 변경은 덮어쓰거나 지우지 않는다", async () => {
+  it("올리지 못한 본문은 덮어쓰지 않고 고르게 한다", async () => {
     await receive(remoteNote(ID));
     await store.saveNote(remoteNote(ID, "이 기기에서 고침"));
-    expect(await receive(remoteNote(ID, "원격에서 고침"))).toBe("pending");
-    expect(await store.applyRemote(ID, null)).toBe("pending");
+    expect(await receive(remoteNote(ID, "원격에서 고침"))).toBe("conflict");
     expect((await store.listNotes())[0]!.text).toBe("이 기기에서 고침");
+    expect((await store.getEntry(ID))!.conflict!.content).toContain("원격에서 고침");
   });
 
   it("읽을 수 없는 파일은 알리고 이전 내용을 남긴다", async () => {
     await receive(remoteNote(ID));
-    await expect(store.applyRemote(ID, "깨진 파일")).rejects.toThrow(FormatError);
+    await expect(store.receive(ID, file("깨진 파일"))).rejects.toThrow(FormatError);
     expect(await store.listNotes()).toHaveLength(1);
   });
 });

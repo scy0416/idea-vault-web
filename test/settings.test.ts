@@ -25,9 +25,9 @@ const file = (content: string, size = content.length) => ({ size, text: async ()
 const NONE = { repository: "", hasGithubToken: false, hasOpenaiKey: false };
 
 async function receiveRemote(id = "20260101000000") {
-  await store.applyRemote(
-    id,
-    serializeNote({
+  await store.receive(id, {
+    sha: "test",
+    content: serializeNote({
       id,
       created: "2026-01-01T00:00:00+09:00",
       text: "받은 노트",
@@ -35,7 +35,7 @@ async function receiveRemote(id = "20260101000000") {
       tagsByUser: false,
       links: [],
     }),
-  );
+  });
 }
 
 describe(".env 해석", () => {
