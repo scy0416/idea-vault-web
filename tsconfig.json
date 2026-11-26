@@ -3,7 +3,8 @@
     "target": "es2023",
     "lib": ["es2023", "dom"],
     "module": "nodenext",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
@@ -12,5 +13,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "scripts", "test"]
+  "include": ["src", "scripts", "test", "vite.config.ts"]
 }
