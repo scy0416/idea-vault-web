@@ -74,7 +74,7 @@ export function buildLinkRequest(note: Note, candidates: Note[], existingTags: s
 
 export function cleanTag(tag: unknown): string {
   if (typeof tag !== "string") return "";
-  return tag.replace(/^#+/, "").replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH).trim();
+  return tag.trim().replace(/^#+/, "").replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH).trim();
 }
 
 /** 많이 쓴 태그부터 */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { openStore, type Store } from "../storage/store.ts";
 import { SettingsScreen } from "./SettingsScreen.tsx";
+import { Vault } from "./Vault.tsx";
 
 export function App({ open = openStore }: { open?: () => Promise<Store> }) {
   const [store, setStore] = useState<Store | null>(null);
@@ -37,11 +38,8 @@ export function App({ open = openStore }: { open?: () => Promise<Store> }) {
           이 브라우저에 저장할 수 없습니다. 사생활 보호 모드나 저장 차단 설정을 확인하세요.
         </p>
       )}
-      {store && settings ? (
-        <SettingsScreen store={store} />
-      ) : (
-        <p className="empty">아직 만드는 중입니다. 노트를 적는 기능은 준비되지 않았습니다.</p>
-      )}
+      {store && settings && <SettingsScreen store={store} />}
+      {store && <Vault store={store} hidden={settings} />}
     </main>
   );
 }

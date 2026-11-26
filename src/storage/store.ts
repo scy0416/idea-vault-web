@@ -21,6 +21,9 @@ export interface Entry {
   revision: number;
 }
 
+/** 사용자가 알아야 할 올리지 못한 변경인지. 올린 적 없이 지운 노트는 잃을 것이 없다. */
+export const isUnsent = (e: Entry): boolean => e.dirty === 1 && (e.note !== null || e.base !== null);
+
 export interface Settings {
   /** "소유자/저장소" */
   repository?: string;
@@ -94,6 +97,20 @@ export async function openStore(factory: IDBFactory = indexedDB, name: string = 
         const previous = await getEntry(s, note.id);
         if (!previous?.note) return false;
         await change(s, previous, note.id, note);
+        return true;
+      });
+    },
+
+    /**
+     * 저장된 최신 내용에 edit를 적용한다. 잇따라 고쳐도 앞의 변경을 덮어쓰지 않는다.
+     * edit가 받은 노트를 그대로 돌려주면 아무것도 바꾸지 않는다. 지운 노트면 false
+     */
+    updateNote(id: string, edit: (note: StoredNote) => StoredNote): Promise<boolean> {
+      return write(NOTES, async (s) => {
+        const previous = await getEntry(s, id);
+        if (!previous?.note) return false;
+        const next = edit(previous.note);
+        if (next !== previous.note) await change(s, previous, id, next);
         return true;
       });
     },

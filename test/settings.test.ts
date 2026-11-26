@@ -131,6 +131,16 @@ describe("설정 처리", () => {
     expect((await saveRepository(store, "Owner/Notes")).repository).toBe("Owner/Notes");
   });
 
+  it("올린 적 없이 지운 노트는 세지 않고, 원격에 있던 노트의 삭제는 센다", async () => {
+    const [made] = await store.addNotes(["가"]);
+    await store.deleteNote(made!.id);
+    expect(await pendingCount(store)).toBe(0);
+
+    await receiveRemote();
+    await store.deleteNote("20260101000000");
+    expect(await pendingCount(store)).toBe(1);
+  });
+
   it("올리지 못한 수를 알려주고 지우면 처음 상태가 된다", async () => {
     await saveRepository(store, "owner/notes");
     await saveSecret(store, "openaiKey", "test-key");

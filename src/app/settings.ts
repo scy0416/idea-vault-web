@@ -1,7 +1,7 @@
 // 설정 화면의 처리. 토큰과 키는 저장소에만 두고 화면에는 있는지 여부만 돌려준다.
 import { parseEnv } from "../core/env-file.ts";
 import { parseRepository } from "../core/repository.ts";
-import type { Settings, Store } from "../storage/store.ts";
+import { isUnsent, type Settings, type Store } from "../storage/store.ts";
 
 export const MAX_ENV_BYTES = 64 * 1024;
 
@@ -71,7 +71,7 @@ export async function importEnv(
   return { summary: summarize(await store.saveSettings(secrets)), loaded };
 }
 
-export const pendingCount = async (store: Store): Promise<number> => (await store.listPending()).length;
+export const pendingCount = async (store: Store): Promise<number> => (await store.listPending()).filter(isUnsent).length;
 
 export async function wipeDevice(store: Store): Promise<Summary> {
   await store.wipe();
